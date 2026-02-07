@@ -1,0 +1,66 @@
+-- 001_create_orders.sql
+
+CREATE TABLE IF NOT EXISTS orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_name VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    total DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);
+
+-- 50 sample orders
+INSERT INTO orders (id, customer_name, status, total, created_at, updated_at) VALUES
+(gen_random_uuid(), 'Alice Johnson', 'pending', 49.99, NOW() - INTERVAL '1 day', NOW()),
+(gen_random_uuid(), 'Bob Smith', 'completed', 129.50, NOW() - INTERVAL '2 days', NOW()),
+(gen_random_uuid(), 'Carol Williams', 'pending', 25.00, NOW() - INTERVAL '3 days', NOW()),
+(gen_random_uuid(), 'David Brown', 'cancelled', 199.99, NOW() - INTERVAL '4 days', NOW()),
+(gen_random_uuid(), 'Eva Davis', 'completed', 75.25, NOW() - INTERVAL '5 days', NOW()),
+(gen_random_uuid(), 'Frank Miller', 'pending', 310.00, NOW() - INTERVAL '6 days', NOW()),
+(gen_random_uuid(), 'Grace Wilson', 'completed', 42.99, NOW() - INTERVAL '7 days', NOW()),
+(gen_random_uuid(), 'Henry Moore', 'pending', 88.50, NOW() - INTERVAL '8 days', NOW()),
+(gen_random_uuid(), 'Ivy Taylor', 'cancelled', 55.00, NOW() - INTERVAL '9 days', NOW()),
+(gen_random_uuid(), 'Jack Anderson', 'completed', 165.75, NOW() - INTERVAL '10 days', NOW()),
+(gen_random_uuid(), 'Kate Thomas', 'pending', 33.33, NOW() - INTERVAL '11 days', NOW()),
+(gen_random_uuid(), 'Leo Jackson', 'completed', 220.00, NOW() - INTERVAL '12 days', NOW()),
+(gen_random_uuid(), 'Mia White', 'pending', 99.99, NOW() - INTERVAL '13 days', NOW()),
+(gen_random_uuid(), 'Noah Harris', 'completed', 15.50, NOW() - INTERVAL '14 days', NOW()),
+(gen_random_uuid(), 'Olivia Martin', 'cancelled', 275.00, NOW() - INTERVAL '15 days', NOW()),
+(gen_random_uuid(), 'Paul Garcia', 'pending', 62.25, NOW() - INTERVAL '16 days', NOW()),
+(gen_random_uuid(), 'Quinn Martinez', 'completed', 189.00, NOW() - INTERVAL '17 days', NOW()),
+(gen_random_uuid(), 'Ryan Robinson', 'pending', 44.00, NOW() - INTERVAL '18 days', NOW()),
+(gen_random_uuid(), 'Sofia Clark', 'completed', 110.50, NOW() - INTERVAL '19 days', NOW()),
+(gen_random_uuid(), 'Tom Rodriguez', 'pending', 78.99, NOW() - INTERVAL '20 days', NOW()),
+(gen_random_uuid(), 'Uma Lewis', 'completed', 95.00, NOW() - INTERVAL '21 days', NOW()),
+(gen_random_uuid(), 'Victor Lee', 'cancelled', 150.00, NOW() - INTERVAL '22 days', NOW()),
+(gen_random_uuid(), 'Wendy Walker', 'pending', 28.75, NOW() - INTERVAL '23 days', NOW()),
+(gen_random_uuid(), 'Xavier Hall', 'completed', 205.25, NOW() - INTERVAL '24 days', NOW()),
+(gen_random_uuid(), 'Yara Allen', 'pending', 67.50, NOW() - INTERVAL '25 days', NOW()),
+(gen_random_uuid(), 'Zach Young', 'completed', 135.99, NOW() - INTERVAL '26 days', NOW()),
+(gen_random_uuid(), 'Anna King', 'pending', 45.00, NOW() - INTERVAL '27 days', NOW()),
+(gen_random_uuid(), 'Ben Wright', 'completed', 82.25, NOW() - INTERVAL '28 days', NOW()),
+(gen_random_uuid(), 'Chloe Scott', 'cancelled', 299.99, NOW() - INTERVAL '29 days', NOW()),
+(gen_random_uuid(), 'Derek Green', 'pending', 52.50, NOW() - INTERVAL '30 days', NOW()),
+(gen_random_uuid(), 'Emma Adams', 'completed', 175.00, NOW() - INTERVAL '1 day', NOW()),
+(gen_random_uuid(), 'Finn Baker', 'pending', 38.99, NOW() - INTERVAL '2 days', NOW()),
+(gen_random_uuid(), 'Gina Nelson', 'completed', 92.75, NOW() - INTERVAL '3 days', NOW()),
+(gen_random_uuid(), 'Hugo Carter', 'pending', 118.00, NOW() - INTERVAL '4 days', NOW()),
+(gen_random_uuid(), 'Isla Mitchell', 'completed', 210.50, NOW() - INTERVAL '5 days', NOW()),
+(gen_random_uuid(), 'Jake Perez', 'cancelled', 65.00, NOW() - INTERVAL '6 days', NOW()),
+(gen_random_uuid(), 'Kira Roberts', 'pending', 142.25, NOW() - INTERVAL '7 days', NOW()),
+(gen_random_uuid(), 'Liam Turner', 'completed', 88.00, NOW() - INTERVAL '8 days', NOW()),
+(gen_random_uuid(), 'Maya Phillips', 'pending', 256.99, NOW() - INTERVAL '9 days', NOW()),
+(gen_random_uuid(), 'Nate Campbell', 'completed', 71.50, NOW() - INTERVAL '10 days', NOW()),
+(gen_random_uuid(), 'Oscar Parker', 'pending', 34.25, NOW() - INTERVAL '11 days', NOW()),
+(gen_random_uuid(), 'Piper Evans', 'completed', 195.00, NOW() - INTERVAL '12 days', NOW()),
+(gen_random_uuid(), 'Quinn Edwards', 'pending', 58.75, NOW() - INTERVAL '13 days', NOW()),
+(gen_random_uuid(), 'Rose Collins', 'completed', 125.50, NOW() - INTERVAL '14 days', NOW()),
+(gen_random_uuid(), 'Sam Stewart', 'cancelled', 85.00, NOW() - INTERVAL '15 days', NOW()),
+(gen_random_uuid(), 'Tara Sanchez', 'pending', 168.99, NOW() - INTERVAL '16 days', NOW()),
+(gen_random_uuid(), 'Ulysses Morris', 'completed', 47.25, NOW() - INTERVAL '17 days', NOW()),
+(gen_random_uuid(), 'Vera Rogers', 'pending', 102.00, NOW() - INTERVAL '18 days', NOW()),
+(gen_random_uuid(), 'Will Reed', 'completed', 233.75, NOW() - INTERVAL '19 days', NOW()),
+(gen_random_uuid(), 'Xena Cook', 'pending', 39.50, NOW() - INTERVAL '20 days', NOW());
