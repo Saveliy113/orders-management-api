@@ -9,5 +9,4 @@ import (
 func Register(app *fiber.App) {
 	app.Get("/alive", controllers.Alive)
 	app.Get("/orders", controllers.GetOrders)
-	app.Post("/orders", controllers.PostOrder)
 }
