@@ -37,22 +37,80 @@ orders-management-api/
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/alive` | Health check. Returns `{"status":"ok"}` |
-| GET | `/orders` | List all orders |
+| GET | `/orders` | List orders with pagination and filtering |
+
+Full OpenAPI specification is available in [`api-docs.yaml`](api-docs.yaml).
 
 ### GET /orders
 
-**Response:**
+Returns a paginated, optionally filtered list of orders sorted by `created_at` descending.
+
+#### Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | int | `1` | Page number (min 1) |
+| `limit` | int | `20` | Items per page (min 1, max 100) |
+| `status` | string | — | Filter by status: `pending`, `completed`, `cancelled` |
+| `date_from` | string | — | Inclusive lower bound on `created_at` (`YYYY-MM-DD` or RFC 3339) |
+| `date_to` | string | — | Inclusive upper bound on `created_at` (`YYYY-MM-DD` or RFC 3339) |
+| `amount_min` | float | — | Inclusive lower bound on order total |
+| `amount_max` | float | — | Inclusive upper bound on order total |
+
+All filter parameters are optional. When omitted, no filtering is applied for that field.
+
+#### Response (200 OK)
+
 ```json
-[
-  {
-    "id": "uuid",
-    "customer_name": "string",
-    "status": "string",
-    "total": 99.99,
-    "created_at": "2025-02-07T12:00:00Z",
-    "updated_at": "2025-02-07T12:00:00Z"
-  }
-]
+{
+  "orders": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "customer_name": "Alice Johnson",
+      "status": "pending",
+      "total": 49.99,
+      "created_at": "2025-02-06T12:00:00Z",
+      "updated_at": "2025-02-07T12:00:00Z"
+    }
+  ],
+  "total": 50,
+  "total_pages": 3
+}
+```
+
+- `total` — total number of matching records (computed via `SELECT COUNT(*)`)
+- `total_pages` — `ceil(total / limit)`
+
+#### Error Response (400 Bad Request)
+
+Returned when a query parameter is invalid:
+
+```json
+{
+  "error": "invalid status parameter, must be one of: pending, completed, cancelled"
+}
+```
+
+#### Examples
+
+```bash
+# Default: first 20 orders
+curl http://localhost:3000/orders
+
+# Page 2 with 10 items per page
+curl "http://localhost:3000/orders?page=2&limit=10"
+
+# Only pending orders
+curl "http://localhost:3000/orders?status=pending"
+
+# Orders created in January 2025
+curl "http://localhost:3000/orders?date_from=2025-01-01&date_to=2025-01-31"
+
+# Orders between $50 and $200
+curl "http://localhost:3000/orders?amount_min=50&amount_max=200"
+
+# Combined: pending orders over $100, page 1, 5 per page
+curl "http://localhost:3000/orders?status=pending&amount_min=100&page=1&limit=5"
 ```
 
 ## Database
