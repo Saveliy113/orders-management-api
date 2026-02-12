@@ -167,6 +167,65 @@ air
 
 The server listens on **http://localhost:3000**
 
+## Security & Performance Review
+
+### SQL Injection
+
+All user-supplied values are passed to PostgreSQL via **parameterized placeholders** (`$1`, `$2`, ...) through pgx. No raw string interpolation is used for filter values. Additionally:
+
+- `status` is validated against a whitelist (`pending`, `completed`, `cancelled`) before reaching the database layer.
+- `date_from` / `date_to` are parsed into `time.Time` — only valid timestamps are forwarded.
+- `amount_min` / `amount_max` are parsed into `float64` — only valid numbers are forwarded.
+- `page` / `limit` are parsed into `int` and clamped to safe ranges.
+
+The `fmt.Sprintf` calls in `dbservice/order.go` only interpolate integer placeholder indices (e.g., `$1`, `$2`), never user input.
+
+### Performance (10k+ records)
+
+The implementation uses standard **OFFSET/LIMIT pagination** with two queries per request (COUNT + data). Performance characteristics:
+
+| Concern | Status | Notes |
+|---------|--------|-------|
+| Indexed ORDER BY | Covered | `idx_orders_created_at` (DESC) matches the query order |
+| Status filtering | Covered | `idx_orders_status` index |
+| Date range filtering | Covered | `idx_orders_created_at` supports range scans |
+| Amount range filtering | No index | Sequential scan on `total` column; fast at 10k, consider adding an index at 100k+ |
+| OFFSET pagination | Acceptable | Scales well to ~10k rows; for deep pages on 100k+ rows, consider keyset (cursor) pagination |
+| COUNT(*) overhead | Acceptable | Runs once per request with the same WHERE clause; PostgreSQL can use index-only scans for simple filters |
+| Connection pooling | Covered | `pgxpool` handles connection reuse |
+| Memory allocation | Optimized | Result slice is pre-allocated to `limit` capacity |
+
+**Scaling recommendations** (if the table grows beyond 100k rows):
+1. Add a composite index: `CREATE INDEX idx_orders_status_created ON orders (status, created_at DESC)`.
+2. Add an index on `total` if amount range filtering is frequent.
+3. Replace OFFSET pagination with keyset pagination (WHERE `created_at < $cursor`).
+
+### Error Handling
+
+| Layer | Behavior |
+|-------|----------|
+| Controller | Returns `400 Bad Request` with a descriptive message for every invalid parameter (page, limit, status, dates, amounts) |
+| Controller | Logs database errors server-side via `log.Printf`; returns a generic `"internal server error"` to the client (no internal details leaked) |
+| Dbservice | Returns errors from both COUNT and data queries; checks `rows.Err()` after iteration |
+| Dbservice | Guards against nil database connection pool |
+| Loaders | Fails fast with `log.Fatalf` if the database is unreachable at startup |
+
+### Edge Cases
+
+| Case | Behavior |
+|------|----------|
+| No query parameters | Returns first 20 orders (default page=1, limit=20), no filtering |
+| `page` < 1 | Clamped to 1 |
+| `limit` < 1 | Clamped to 1 |
+| `limit` > 100 | Clamped to 100 |
+| Page beyond last | Returns empty `orders` array; `total` and `total_pages` still reflect the full filtered count |
+| No matching filters | Returns `{"orders": [], "total": 0, "total_pages": 0}` |
+| `date_from` > `date_to` | Returns empty results (no validation error; the range simply matches nothing) |
+| `amount_min` > `amount_max` | Same as above — empty results, no error |
+| Non-numeric `page` or `limit` | Returns `400` with error message |
+| Unrecognized `status` value | Returns `400` with allowed values listed |
+| Malformed date string | Returns `400` with expected format hint |
+
 ## How to Run Tests
 
 ### API integration tests (API must be running)

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"log"
 	"strconv"
 	"time"
 
@@ -106,8 +107,9 @@ func GetOrders(c *fiber.Ctx) error {
 
 	result, err := services.ListOrders(c.Context(), filter)
 	if err != nil {
+		log.Printf("ERROR GetOrders: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+			"error": "internal server error",
 		})
 	}
 

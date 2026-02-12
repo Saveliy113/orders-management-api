@@ -2,6 +2,7 @@ package dbservice
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -12,6 +13,9 @@ import (
 
 func ListOrders(ctx context.Context, filter models.OrderFilter) (models.OrderListResponse, error) {
 	db := loaders.DB
+	if db == nil {
+		return models.OrderListResponse{}, errors.New("database connection is not initialized")
+	}
 
 	var (
 		conditions []string
@@ -80,7 +84,9 @@ func ListOrders(ctx context.Context, filter models.OrderFilter) (models.OrderLis
 		whereClause, limitPlaceholder, offsetPlaceholder,
 	)
 
-	dataArgs := append(args, filter.Limit, offset)
+	dataArgs := make([]any, len(args), len(args)+2)
+	copy(dataArgs, args)
+	dataArgs = append(dataArgs, filter.Limit, offset)
 
 	rows, err := db.Query(ctx, dataQuery, dataArgs...)
 	if err != nil {
