@@ -2,114 +2,114 @@ package dbservice
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
 	"strings"
-
-	"github.com/google/uuid"
 
 	"orders-management-api/loaders"
 	"orders-management-api/models"
 )
 
-func ListOrders(ctx context.Context, page, limit int, filters models.OrderFilters) ([]models.Order, int64, error) {
+func ListOrders(ctx context.Context, filter models.OrderFilter) (models.OrderListResponse, error) {
 	db := loaders.DB
-	offset := (page - 1) * limit
-	if offset < 0 {
-		offset = 0
-	}
-	if limit < 1 {
-		limit = 10
-	}
-	if limit > 100 {
-		limit = 100
+	if db == nil {
+		return models.OrderListResponse{}, errors.New("database connection is not initialized")
 	}
 
-	where, args := buildWhereClause(filters)
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM orders%s", where)
-	total := int64(0)
-	err := db.QueryRow(ctx, countQuery, args...).Scan(&total)
-	if err != nil {
-		return nil, 0, err
+	var (
+		conditions []string
+		args       []any
+		argIndex   int
+	)
+
+	if filter.Status != "" {
+		argIndex++
+		conditions = append(conditions, fmt.Sprintf("status = $%d", argIndex))
+		args = append(args, filter.Status)
 	}
 
-	args = append(args, limit, offset)
-	limitOffset := fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)-1, len(args))
-	selectQuery := fmt.Sprintf(
+	if !filter.DateFrom.IsZero() {
+		argIndex++
+		conditions = append(conditions, fmt.Sprintf("created_at >= $%d", argIndex))
+		args = append(args, filter.DateFrom)
+	}
+
+	if !filter.DateTo.IsZero() {
+		argIndex++
+		conditions = append(conditions, fmt.Sprintf("created_at <= $%d", argIndex))
+		args = append(args, filter.DateTo)
+	}
+
+	if filter.AmountMin != nil {
+		argIndex++
+		conditions = append(conditions, fmt.Sprintf("total >= $%d", argIndex))
+		args = append(args, *filter.AmountMin)
+	}
+
+	if filter.AmountMax != nil {
+		argIndex++
+		conditions = append(conditions, fmt.Sprintf("total <= $%d", argIndex))
+		args = append(args, *filter.AmountMax)
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	// Count total matching records.
+	countQuery := "SELECT COUNT(*) FROM orders" + whereClause
+
+	var total int
+	if err := db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return models.OrderListResponse{}, err
+	}
+
+	totalPages := int(math.Ceil(float64(total) / float64(filter.Limit)))
+
+	// Fetch the page of orders.
+	offset := (filter.Page - 1) * filter.Limit
+
+	argIndex++
+	limitPlaceholder := fmt.Sprintf("$%d", argIndex)
+	argIndex++
+	offsetPlaceholder := fmt.Sprintf("$%d", argIndex)
+
+	dataQuery := fmt.Sprintf(
 		`SELECT id, customer_name, status, total, created_at, updated_at
 		 FROM orders%s
-		 ORDER BY created_at DESC%s`,
-		where, limitOffset,
+		 ORDER BY created_at DESC
+		 LIMIT %s OFFSET %s`,
+		whereClause, limitPlaceholder, offsetPlaceholder,
 	)
-	rows, err := db.Query(ctx, selectQuery, args...)
+
+	dataArgs := make([]any, len(args), len(args)+2)
+	copy(dataArgs, args)
+	dataArgs = append(dataArgs, filter.Limit, offset)
+
+	rows, err := db.Query(ctx, dataQuery, dataArgs...)
 	if err != nil {
-		return nil, 0, err
+		return models.OrderListResponse{}, err
 	}
 	defer rows.Close()
 
-	var orders []models.Order
+	orders := make([]models.Order, 0, filter.Limit)
 	for rows.Next() {
 		var o models.Order
-		err := rows.Scan(&o.ID, &o.CustomerName, &o.Status, &o.Total, &o.CreatedAt, &o.UpdatedAt)
-		if err != nil {
-			return nil, 0, err
+		if err := rows.Scan(&o.ID, &o.CustomerName, &o.Status, &o.Total, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			return models.OrderListResponse{}, err
 		}
 		orders = append(orders, o)
 	}
 
-	return orders, total, rows.Err()
-}
-
-func CreateOrder(ctx context.Context, input models.CreateOrderInput) (models.Order, error) {
-	db := loaders.DB
-
-	id := uuid.New()
-
-	var order models.Order
-	err := db.QueryRow(ctx,
-		`INSERT INTO orders (id, customer_name, status, total, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, NOW(), NOW())
-		 RETURNING id, customer_name, status, total, created_at, updated_at`,
-		id, input.CustomerName, input.Status, input.Total,
-	).Scan(&order.ID, &order.CustomerName, &order.Status, &order.Total, &order.CreatedAt, &order.UpdatedAt)
-	if err != nil {
-		return models.Order{}, err
+	if err := rows.Err(); err != nil {
+		return models.OrderListResponse{}, err
 	}
 
-	return order, nil
-}
-
-func buildWhereClause(filters models.OrderFilters) (string, []interface{}) {
-	var conditions []string
-	var args []interface{}
-	paramNum := 1
-
-	if filters.Status != nil && *filters.Status != "" {
-		conditions = append(conditions, fmt.Sprintf("status = $%d", paramNum))
-		args = append(args, *filters.Status)
-		paramNum++
-	}
-	if filters.MinAmount != nil {
-		conditions = append(conditions, fmt.Sprintf("total >= $%d", paramNum))
-		args = append(args, *filters.MinAmount)
-		paramNum++
-	}
-	if filters.MaxAmount != nil {
-		conditions = append(conditions, fmt.Sprintf("total <= $%d", paramNum))
-		args = append(args, *filters.MaxAmount)
-		paramNum++
-	}
-	if filters.FromDate != nil {
-		conditions = append(conditions, fmt.Sprintf("created_at >= $%d", paramNum))
-		args = append(args, *filters.FromDate)
-		paramNum++
-	}
-	if filters.ToDate != nil {
-		conditions = append(conditions, fmt.Sprintf("created_at <= $%d", paramNum))
-		args = append(args, *filters.ToDate)
-	}
-
-	if len(conditions) == 0 {
-		return "", args
-	}
-	return " WHERE " + strings.Join(conditions, " AND "), args
+	return models.OrderListResponse{
+		Orders:     orders,
+		Total:      total,
+		TotalPages: totalPages,
+	}, nil
 }
